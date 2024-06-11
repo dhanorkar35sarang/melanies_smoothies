@@ -1,5 +1,5 @@
-# Import python packages
 import streamlit as st
+import pandas as pd
 from snowflake.snowpark.functions import col
 import requests
 
@@ -14,13 +14,16 @@ st.write("The name on your Smoothie will be:", name_on_order)
 # Step 3: Connect to Snowflake and retrieve fruit options
 cnx = st.connection("snowflake")
 session = cnx.session()
-my_dataframe = session.sql("SELECT FRUIT_NAME FROM smoothies.public.fruit_options").collect()
-st.dataframe(data=my_dataframe, use_container_width=True)
+my_dataframe = session.sql("SELECT FRUIT_NAME, SEARCH_ON FROM smoothies.public.fruit_options").collect()
+
+# Convert Snowpark DataFrame to Pandas DataFrame
+pd_df = pd.DataFrame(my_dataframe)
+st.dataframe(data=pd_df, use_container_width=True)
 
 # Step 4: Add a multiselect for choosing smoothie ingredients
 ingredients_list = st.multiselect(
     'Choose up to 5 ingredients:',
-    ['Dragon Fruit', 'Guava', 'Jackfruit', 'Elderberries', 'Kiwi'],
+    pd_df['FRUIT_NAME'].tolist(),
     max_selections=5
 )
 
@@ -30,12 +33,17 @@ if ingredients_list:
     
     for fruit_chosen in ingredients_list:
         ingredients_string += fruit_chosen + ' '
-        st.subheader(fruit_chosen + 'Nutrition Information')
-        fruityvice_response = requests.get("https://fruityvice.com/api/fruit/" + fruit_chosen)
+        st.subheader(fruit_chosen + ' Nutrition Information')
+        
+        # Get the "Search On" value
+        search_on = pd_df.loc[pd_df['FRUIT_NAME'] == fruit_chosen, 'SEARCH_ON'].iloc[0]
+        st.write('The search value for ', fruit_chosen, ' is ', search_on, '.')
+        
+        fruityvice_response = requests.get("https://fruityvice.com/api/fruit/" + search_on)
         fv_df = st.dataframe(data=fruityvice_response.json(), use_container_width=True)
     
-    my_insert_stmt = """ insert into smoothies.public.orders(ingredients, name_on_order)
-            values ('""" + ingredients_string + """','""" + name_on_order + """')"""
+    my_insert_stmt = f"""INSERT INTO smoothies.public.orders (ingredients, name_on_order)
+                        VALUES ('{ingredients_string.strip()}', '{name_on_order}')"""
     
     # Step 6: Add a button to submit the order
     time_to_insert = st.button('Submit Order')
@@ -45,8 +53,6 @@ if ingredients_list:
         session.sql(my_insert_stmt).collect()
         st.success(f'Your smoothie is ordered, {name_on_order}!', icon="✅")
 
-
-fruityvice_response = requests.get("https://fruityvice.com/api/fruit/watermelon")
-#st.text(fruityvice_response.json())
-fv_df = st.dataframe(data=fruityvice_response.json(), use_container_width=True)
-
+# Example for testing with a specific fruit (optional)
+# fruityvice_response = requests.get("https://fruityvice.com/api/fruit/watermelon")
+# fv_df = st.dataframe(data=fruityvice_response.json(), use_container_width=True)
