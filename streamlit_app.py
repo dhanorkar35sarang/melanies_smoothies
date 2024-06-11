@@ -1,6 +1,5 @@
 # Import python packages
 import streamlit as st
-from snowflake.snowpark.context import get_active_session
 from snowflake.snowpark.functions import col
 
 # Step 1: Set up the app title and description
@@ -12,8 +11,8 @@ name_on_order = st.text_input("Name on Smoothie:")
 st.write("The name on your Smoothie will be:", name_on_order)
 
 # Step 3: Connect to Snowflake and retrieve fruit options
-session = get_active_session()
-my_dataframe = session.table("smoothies.public.fruit_options").select(col('FRUIT_NAME'))
+cnx = st.connection("snowflake")
+session = cnx.session("smoothies.public.fruit_options").select(col('FRUIT_NAME'))
 st.dataframe(data=my_dataframe, use_container_width=True)
 
 # Step 4: Add a multiselect for choosing smoothie ingredients
