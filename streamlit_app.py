@@ -1,62 +1,36 @@
 import streamlit as st
 import pandas as pd
-from snowflake.snowpark.functions import col
 import requests
 
-# Step 1: Set up the app title and description
+# Set up the app title and description
 st.title(":cup_with_straw: Customize Your Smoothie! :cup_with_straw:")
 st.write("Choose the fruits you want in your custom Smoothie!")
 
-# Step 2: Add a text input for the smoothie name
+# Add a text input for the smoothie name
 name_on_order = st.text_input("Name on Smoothie:")
 st.write("The name on your Smoothie will be:", name_on_order)
 
-# Step 3: Connect to Snowflake and retrieve fruit options
+# Connect to Snowflake and retrieve fruit options
 cnx = st.connection("snowflake")
 session = cnx.session()
 my_dataframe = session.sql("SELECT FRUIT_NAME, SEARCH_ON FROM smoothies.public.fruit_options").collect()
 
-# Convert Snowpark DataFrame to Pandas DataFrame
-pd_df = pd.DataFrame(my_dataframe)
+# Convert Snowpark DataFrame to Pandas DataFrame and rename columns
+pd_df = pd.DataFrame(my_dataframe, columns=['FRUIT_NAME', 'SEARCH_ON'])
+
+# Add the new SEARCH_ON column to the DataFrame
+pd_df['SEARCH_ON'] = pd_df['SEARCH_ON'].apply(lambda x: fruit_name_mapping.get(x, x))
+
 st.dataframe(data=pd_df, use_container_width=True)
 
-# Step 4: Add a multiselect for choosing smoothie ingredients
+# Add a multiselect for choosing smoothie ingredients
 ingredients_list = st.multiselect(
     'Choose up to 5 ingredients:',
     pd_df['FRUIT_NAME'].tolist(),
     max_selections=5
 )
 
-# Fruit name mapping for the Fruityvice API
-fruit_name_mapping = {
-    'Elderberries': 'elderberry',
-    'Dragon Fruit': 'dragonfruit',
-    'Figs': 'fig',
-    'Guava': 'guava',
-    'Kiwi': 'kiwi',
-    'Strawberries': 'strawberry',
-    'Blueberries': 'blueberry',
-    'Raspberries': 'raspberry',
-    'Apples': 'apple',
-    'Cantaloupe': 'cantaloupe',
-    'Honeydew': 'honeydew',
-    'Jackfruit': 'jackfruit',
-    'Lime': 'lime',
-    'Mango': 'mango',
-    'Nectarine': 'nectarine',
-    'Orange': 'orange',
-    'Papaya': 'papaya',
-    'Quince': 'quince',
-    'Tangerine': 'tangerine',
-    'Ugli Fruit': 'uglifruit',
-    'Vanilla Fruit': 'vanillafruit',
-    'Watermelon': 'watermelon',
-    'Ximenia': 'ximenia',
-    'Yerba Mate': 'yerbamate',
-    'Ziziphus Jujube': 'ziziphusjujube'
-}
-
-# Step 5: Process the selected ingredients and generate the SQL insert statement
+# Process the selected ingredients and generate the SQL insert statement
 if ingredients_list:
     ingredients_string = ''
     
@@ -67,35 +41,26 @@ if ingredients_list:
         # Get the "Search On" value
         search_on = pd_df.loc[pd_df['FRUIT_NAME'] == fruit_chosen, 'SEARCH_ON'].iloc[0]
         
-        # Check if the search_on value is valid
-        if search_on and isinstance(search_on, str) and search_on.strip():
-            search_on = fruit_name_mapping.get(fruit_chosen, search_on)
-            st.write('The search value for ', fruit_chosen, ' is ', search_on, '.')
+        st.write('The search value for ', fruit_chosen, ' is ', search_on, '.')
+        
+        try:
+            fruityvice_response = requests.get(f"https://fruityvice.com/api/fruit/{search_on}")
+            fruityvice_response.raise_for_status()  # Raise an HTTPError if the HTTP request returned an unsuccessful status code
             
-            try:
-                fruityvice_response = requests.get(f"https://fruityvice.com/api/fruit/{search_on}")
-                fruityvice_response.raise_for_status()  # Raise an HTTPError if the HTTP request returned an unsuccessful status code
-                
-                fv_df = pd.DataFrame([fruityvice_response.json()])
-                st.dataframe(data=fv_df, use_container_width=True)
-            except requests.exceptions.HTTPError as http_err:
-                st.write(f"HTTP error occurred for {fruit_chosen}: {http_err}")
-            except Exception as err:
-                st.write(f"Other error occurred for {fruit_chosen}: {err}")
-        else:
-            st.write(f"Invalid search value for {fruit_chosen}. Please update the SEARCH_ON column.")
+            fv_df = pd.DataFrame([fruityvice_response.json()])
+            st.dataframe(data=fv_df, use_container_width=True)
+        except requests.exceptions.HTTPError as http_err:
+            st.write(f"HTTP error occurred for {fruit_chosen}: {http_err}")
+        except Exception as err:
+            st.write(f"Other error occurred for {fruit_chosen}: {err}")
     
     my_insert_stmt = f"""INSERT INTO smoothies.public.orders (ingredients, name_on_order)
                         VALUES ('{ingredients_string.strip()}', '{name_on_order}')"""
     
-    # Step 6: Add a button to submit the order
+    # Add a button to submit the order
     time_to_insert = st.button('Submit Order')
     
-    # Step 7: Execute the SQL insert statement and display a success message
+    # Execute the SQL insert statement and display a success message
     if time_to_insert:
         session.sql(my_insert_stmt).collect()
         st.success(f'Your smoothie is ordered, {name_on_order}!', icon="✅")
-
-# Example for testing with a specific fruit (optional)
-# fruityvice_response = requests.get("https://fruityvice.com/api/fruit/watermelon")
-# fv_df = st.dataframe(data=fruityvice_response.json(), use_container_width=True)
