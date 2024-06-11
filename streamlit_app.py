@@ -42,13 +42,16 @@ if ingredients_list:
         if search_on and isinstance(search_on, str) and search_on.strip():
             st.write('The search value for ', fruit_chosen, ' is ', search_on, '.')
             
-            fruityvice_response = requests.get("https://fruityvice.com/api/fruit/" + search_on)
-            
-            if fruityvice_response.status_code == 200:
+            try:
+                fruityvice_response = requests.get("https://fruityvice.com/api/fruit/" + search_on)
+                fruityvice_response.raise_for_status()  # Raise an HTTPError if the HTTP request returned an unsuccessful status code
+                
                 fv_df = pd.DataFrame(fruityvice_response.json())
                 st.dataframe(data=fv_df, use_container_width=True)
-            else:
-                st.write(f"Could not fetch data for {fruit_chosen}.")
+            except requests.exceptions.HTTPError as http_err:
+                st.write(f"HTTP error occurred for {fruit_chosen}: {http_err}")
+            except Exception as err:
+                st.write(f"Other error occurred for {fruit_chosen}: {err}")
         else:
             st.write(f"Invalid search value for {fruit_chosen}. Please update the SEARCH_ON column.")
     
