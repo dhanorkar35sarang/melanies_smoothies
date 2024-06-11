@@ -37,8 +37,28 @@ if ingredients_list:
         
         # Get the "Search On" value
         search_on = pd_df.loc[pd_df['FRUIT_NAME'] == fruit_chosen, 'SEARCH_ON'].iloc[0]
-        st.write('The search value for ', fruit_chosen, ' is ', search_on, '.')
-
-        # Ensure the search_on variable is a string
-        if isinstance(search_on, str) and search_on:
-            fruityvice_response = requests
+        
+        # Check if the search_on value is valid
+        if search_on and isinstance(search_on, str):
+            st.write('The search value for ', fruit_chosen, ' is ', search_on, '.')
+            
+            fruityvice_response = requests.get("https://fruityvice.com/api/fruit/" + search_on)
+            
+            if fruityvice_response.status_code == 200:
+                fv_df = pd.DataFrame(fruityvice_response.json())
+                st.dataframe(data=fv_df, use_container_width=True)
+            else:
+                st.write(f"Could not fetch data for {fruit_chosen}.")
+        else:
+            st.write(f"Invalid search value for {fruit_chosen}.")
+    
+    my_insert_stmt = f"""INSERT INTO smoothies.public.orders (ingredients, name_on_order)
+                        VALUES ('{ingredients_string.strip()}', '{name_on_order}')"""
+    
+    # Step 6: Add a button to submit the order
+    time_to_insert = st.button('Submit Order')
+    
+    # Step 7: Execute the SQL insert statement and display a success message
+    if time_to_insert:
+        session.sql(my_insert_stmt).collect()
+        st.success(f'Your smoothie is ordered, {name_on_order}!', icon="✅")
