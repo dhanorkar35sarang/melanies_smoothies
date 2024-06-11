@@ -38,9 +38,17 @@ if ingredients_list:
         # Get the "Search On" value
         search_on = pd_df.loc[pd_df['FRUIT_NAME'] == fruit_chosen, 'SEARCH_ON'].iloc[0]
         st.write('The search value for ', fruit_chosen, ' is ', search_on, '.')
-        
-        fruityvice_response = requests.get("https://fruityvice.com/api/fruit/" + search_on)
-        fv_df = st.dataframe(data=fruityvice_response.json(), use_container_width=True)
+
+        # Ensure the search_on variable is a string
+        if isinstance(search_on, str) and search_on:
+            fruityvice_response = requests.get(f"https://fruityvice.com/api/fruit/{search_on}")
+            if fruityvice_response.status_code == 200:
+                fv_df = pd.DataFrame(fruityvice_response.json())
+                st.dataframe(data=fv_df, use_container_width=True)
+            else:
+                st.write(f"Could not fetch data for {fruit_chosen}.")
+        else:
+            st.write(f"Invalid search value for {fruit_chosen}.")
     
     my_insert_stmt = f"""INSERT INTO smoothies.public.orders (ingredients, name_on_order)
                         VALUES ('{ingredients_string.strip()}', '{name_on_order}')"""
