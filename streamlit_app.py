@@ -27,6 +27,35 @@ ingredients_list = st.multiselect(
     max_selections=5
 )
 
+# Fruit name mapping for the Fruityvice API
+fruit_name_mapping = {
+    'Elderberries': 'elderberry',
+    'Dragon Fruit': 'dragonfruit',
+    'Figs': 'fig',
+    'Guava': 'guava',
+    'Kiwi': 'kiwi',
+    'Strawberries': 'strawberry',
+    'Blueberries': 'blueberry',
+    'Raspberries': 'raspberry',
+    'Apples': 'apple',
+    'Cantaloupe': 'cantaloupe',
+    'Honeydew': 'honeydew',
+    'Jackfruit': 'jackfruit',
+    'Lime': 'lime',
+    'Mango': 'mango',
+    'Nectarine': 'nectarine',
+    'Orange': 'orange',
+    'Papaya': 'papaya',
+    'Quince': 'quince',
+    'Tangerine': 'tangerine',
+    'Ugli Fruit': 'uglifruit',
+    'Vanilla Fruit': 'vanillafruit',
+    'Watermelon': 'watermelon',
+    'Ximenia': 'ximenia',
+    'Yerba Mate': 'yerbamate',
+    'Ziziphus Jujube': 'ziziphusjujube'
+}
+
 # Step 5: Process the selected ingredients and generate the SQL insert statement
 if ingredients_list:
     ingredients_string = ''
@@ -40,13 +69,14 @@ if ingredients_list:
         
         # Check if the search_on value is valid
         if search_on and isinstance(search_on, str) and search_on.strip():
+            search_on = fruit_name_mapping.get(fruit_chosen, search_on)
             st.write('The search value for ', fruit_chosen, ' is ', search_on, '.')
             
             try:
-                fruityvice_response = requests.get("https://fruityvice.com/api/fruit/" + search_on)
+                fruityvice_response = requests.get(f"https://fruityvice.com/api/fruit/{search_on}")
                 fruityvice_response.raise_for_status()  # Raise an HTTPError if the HTTP request returned an unsuccessful status code
                 
-                fv_df = pd.DataFrame(fruityvice_response.json())
+                fv_df = pd.DataFrame([fruityvice_response.json()])
                 st.dataframe(data=fv_df, use_container_width=True)
             except requests.exceptions.HTTPError as http_err:
                 st.write(f"HTTP error occurred for {fruit_chosen}: {http_err}")
